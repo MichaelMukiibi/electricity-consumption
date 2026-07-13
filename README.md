@@ -21,9 +21,28 @@ Forecast hourly electricity consumption using the Kaggle PJM Hourly Energy Consu
   ```
 
 ### 2. Training 
+
+* ### Use an instant VM
 To run the script on an automatically managed T4 GPU instance, the CLI handles instant VM provisioning, pipes the code from your local machine, and automatically destroys the runtime on completion:
 
 ```bash
 colab run --gpu T4 train.py --cell LSTM --epochs 5 --batch_size 64
+```
+
+* ### Provision a session
+To configure your environment fully before shipping execution code, provision a dedicated T4 GPU session;
+
+```bash
+# Allocate T4 GPU host
+colab new -s electricity-training --gpu T4
+
+# Install third-party packages into remote system kernel
+colab install -s electricity-training torch pandas numpy
+
+# Stream script to the remote host
+colab run -s electricity-training --keep train.py --cell LSTM --epochs 10 --batch_size 64
+
+# Stop the remote session
+colab stop -s electricity-training
 ```
 
