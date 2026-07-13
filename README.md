@@ -19,3 +19,11 @@ Forecast hourly electricity consumption using the Kaggle PJM Hourly Energy Consu
   ```bash
   uv pip install torch pandas
   ```
+
+### 2. Training 
+To run the script on an automatically managed T4 GPU instance, the CLI handles instant VM provisioning, pipes the code from your local machine, and automatically destroys the runtime on completion:
+
+```bash
+colab run --gpu T4 train.py --cell LSTM --epochs 5 --batch_size 64
+```
+
