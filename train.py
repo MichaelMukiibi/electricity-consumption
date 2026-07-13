@@ -4,8 +4,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+import wandb
 
-# 1. Dataset Construction Abstraction
+# Dataset Class Definition
 class ElectricityDataset(Dataset):
     """Prepares time-series window sequences and targets for PyTorch models."""
     def __init__(self, sequences, targets):
@@ -18,7 +19,7 @@ class ElectricityDataset(Dataset):
     def __getitem__(self, idx):
         return self.sequences[idx], self.targets[idx]
 
-# 2. Modular Reconstructed Model Architecture
+# Model Architecture
 class ElectricityForecaster(nn.Module):
     """Flexible recurrent network mapping historical windows to future consumption."""
     def __init__(self, cell_type, input_size, hidden_size, output_size):
@@ -41,7 +42,7 @@ class ElectricityForecaster(nn.Module):
         out = self.fc(out[:, -1, :])
         return out
 
-# 3. Data Pipeline Processing
+# Data Ingestion Pipeline
 def load_and_preprocess_data(seq_length=24):
     """Downloads, chronologically sorts, normalizes, and slices the PJME dataset."""
     print("Loading data from remote source...")
@@ -82,7 +83,9 @@ def run_training(model, dataloader, device, epochs=3, lr=0.001):
             
             total_loss += loss.item()
         
-        print(f"Epoch {epoch+1}/{epochs} | Mean Loss: {total_loss/len(dataloader):.5f}")
+        epoch_loss = total_loss / len(dataloader)
+        print(f"Epoch {epoch+1}/{epochs} | Mean Loss: {epoch_loss:.5f}")
+        wandb.log({"epoch": epoch + 1, "loss": epoch_loss})
 
 if __name__ == '__main__':
     # Parse CLI configurations
@@ -91,21 +94,26 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=3, help="Total training epochs")
     parser.add_argument('--batch_size', type=int, default=32, help="DataLoader batch footprint size")
     parser.add_argument('--lr', type=float, default=0.001, help="Learning rate factor")
+    parser.add_argument('--wandb_key', type=str, required=True)
     args = parser.parse_args()
+
+    # Configure W&B
+    os.environ["WANDB_API_KEY"] = args.wandb_key
+    wandb.init(project="electricity-consumption", config=vars(args))
 
     # Runtime Environment Setup
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Executing workflow pipeline on device: {device}")
 
     # Process and build DataLoaders
-    X, y = load_and_preprocess_data(seq_length=24)
+    X, y = load_and_preprocess_data()
     
     # Use the full dataset instead of small subsamples for structural execution
     dataset = ElectricityDataset(X, y)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
     
     # Instantiate custom parameters
-    forecaster_model = ElectricityForecaster(
+    model = ElectricityForecaster(
         cell_type=args.cell, 
         input_size=1, 
         hidden_size=32, 
@@ -114,9 +122,11 @@ if __name__ == '__main__':
     
     # Run pipeline loop
     run_training(
-        model=forecaster_model, 
+        model=model, 
         dataloader=dataloader, 
         device=device, 
         epochs=args.epochs, 
         lr=args.lr
     )
+
+    wandb.finish()
